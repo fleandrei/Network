@@ -12,26 +12,47 @@ Allows you to get the board data and play one turn.
 
 extern int debug;	/* hack to enable debug messages */
 
-typedef enum etat{libre,adverse,notre,encour}etat;
-
-typedef struct node{
+typedef enum etat{LIBRE,ADVERSE,NOTRE,ENCOUR}etat;
+typedef enum Type{VIDE,HORIZONTAL,VERTICAL,TYP1,TYP2,TYP3}Type;
+typedef struct caze{
   int x;
   int y;
-  int type;
+  Type typ;
   etat statu;
-  struct node*d;
-  struct node*h;
-  struct node*g;
-  struct node*b;
+  struct caze*d;
+  struct caze*h;
+  struct caze*g;
+  struct caze*b;
   int ntc; //Nombre de tour nécéssaire avant d'être capturé.
-}node;
+}caze;
 
 
 void jouer_soi_meme(char*boardData, t_return_code ret, int player, int x, int y);
 //node* init(char*boardData,int x, int y); 
 
-int captur(node joueur[],int nbrnode,int x, int y,char BoardData[]); 
 
+int captur(caze joueur[],int nbrnode,int x, int y,char BoardData[]){
+  joueur[nbrnode].x=x;
+  joueur[nbrnode].y=y;
+  joueur[nbrnode].typ=(int)BoardData[x*y+x];
+  if(joueur[nbrnode].typ==5){
+    joueur[nbrnode].ntc=2;
+    joueur[nbrnode].statu=ENCOUR;
+  }else if(joueur[nbrnode].typ==4){
+    joueur[nbrnode].ntc=1;
+    joueur[nbrnode].statu=ENCOUR;
+  }else{
+    joueur[nbrnode].ntc=0;
+    joueur[nbrnode].statu=NOTRE;
+  }
+
+  nbrnode=nbrnode+1;
+  return nbrnode;
+
+      }
+void affichejoueur(caze joueur[],int nbrnode);
+
+caze* initmap(char BoardData[],int X,int Y);
 
 int main()
 {
@@ -42,12 +63,15 @@ int main()
 	t_move move;						/* a move */
 	int player;
 	int sizeX, sizeY;
-
+	int nbrnode_j = 0;
+	int nbrnode_a = 0;
+	int E_j=0;
+	int E_a=0;
 	/* connection to the server */
 	connectToServer("pc4200.polytech.upmc.fr", 1234, "Guillaume_Andrei");
 	
 	/* wait for a game, and retrieve informations about it */
-	waitForBoard("NEO timeout=3600 ", boardName, &sizeX, &sizeY);
+	waitForBoard("NEO timeout=10 ", boardName, &sizeX, &sizeY);
 	boardData = (char*) malloc(sizeX * sizeY);
 	player = getBoardData(boardData);
 	
@@ -55,12 +79,22 @@ int main()
 	printBoard();
 	//	jouer_soi_meme( boardData, ret, player, sizeX, sizeY);
 	 
-
+	caze* map=initmap(boardData,sizeX,sizeY);
 	
 	
-	node*nous=(node*)malloc(sizeof(node)*(sizeX*sizeY/2));
-	node*advers=(node*)malloc(sizeof(node)*(sizeX*sizeY/2));
-	
+	caze*nous=(caze*)malloc(sizeof(caze)*(sizeX*sizeY/2));
+	caze*advers=(caze*)malloc(sizeof(caze)*(sizeX*sizeY/2));
+	if(player==1){ //si l'adverssaire commence
+	  E_j=2;
+	  nbrnode_a=captur(advers,nbrnode_a,0,0,boardData);
+	  nbrnode_j=captur(nous,nbrnode_j,sizeX-1,sizeY-1,boardData);
+	}else{
+	  E_a=2;
+	  nbrnode_a=captur(advers,nbrnode_a,sizeX-1,sizeY-1,boardData);
+	  nbrnode_j=captur(nous,nbrnode_j,0,0,boardData);
+	}
+	affichejoueur(nous,nbrnode_j);
+	affichejoueur(advers,nbrnode_a);
 	  while(ret == NORMAL_MOVE){
 	/* opponent turn */
 
@@ -162,23 +196,29 @@ void jouer_soi_meme(char*boardData, t_return_code ret, int player, int x, int y)
   tete->type=(int)boardData[]
 */
 
-int captur(node joueur[],int nbrnode,int x, int y,char BoardData){
-  joueur[nbrnode].x=x;
-  joueur[nbrnode].y=y;
-  joueur[nbrnode].type=(int)BoardData[x*y+x];
-  if(joueur[nbrnode].type==5){
-    joueur[nbrnode].ntc=2;
-    joueur[nbrnode].statu=encour;
-  }else if(joueur[nbrnode].type==4){
-    joueur[nbrnode].ntc=1;
-    joueur[nbrnode].statu=encour;
-  }else{
-    joueur[nbrnode].ntc=0;
-    joueur[nbrnode].statu=notre;
-  }
-  nbrnode=nbrnode+1;
-  return nbrnode;
 
-      }
-  
-  
+void affichejoueur(caze joueur[],int nbrnode){
+  int i=0;
+  if(nbrnode==0){
+    printf("Il y a une erreure le joueur ne possède aucun noeud\n");
+  }
+  for(i=0;i<nbrnode;i++){
+    printf("N%d.X=%d\n",i+1,joueur[i].x);  
+    printf("N%d.Y=%d\n",i+1,joueur[i].y);
+    printf("N%d.statu=%d\n",i+1,joueur[i].statu);
+    printf("N%d.type=%d\n",i+1,joueur[i].typ);
+  }
+}
+
+caze* initmap(char BoardData[],int X,int Y){
+  int i=0;
+  int N=X*Y;
+  caze *map=(caze*)malloc(sizeof(caze)*N);
+  for(i=0;i<N;i++){
+    map[i].x=i%X;
+    map[i].y=i/X;
+    map[i].typ=(int)BoardData[i];
+    map[i].statu=LIBRE;
+  }
+  return map;
+}
